@@ -1,4 +1,4 @@
-# Serbian Supreme Court Criminal Practice Assistant 🥚
+# Legal Egg AI 🥚 - Serbian Supreme Court Criminal Practice Assistant 
 
 An AI-powered legal assistant specializing in Serbian Supreme Court criminal practice patterns and precedents.
 
