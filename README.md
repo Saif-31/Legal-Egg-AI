@@ -84,30 +84,4 @@ Court-Practices/
 └── OVERVIEW.md        # Technical overview
 ```
 
-### Contributing
-1. Fork the repository
-2. Create feature branch
-3. Commit changes
-4. Submit pull request
 
-## License
-
-[License Type] - See LICENSE file for details
-
-## Credits
-
-- Built with Streamlit
-- Powered by Mistral AI
-- Vector search by Pinecone
-- Embeddings by HuggingFace
-
-## Support
-
-For issues and questions:
-- Open an issue
-- Contact maintainers
-- Check documentation
-
----
-
-**Note**: This is a specialized legal tool. Always consult qualified legal professionals for actual legal advice.
