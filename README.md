@@ -83,7 +83,5 @@ Court-Practices/
 ├── GUIDE.md           # User guide
 └── OVERVIEW.md        # Technical overview
 ```
-![Legal Egg AI 🥚 - Research Assistant of Serbian Supreme Court Criminal Practices](https://github.com/user-attachments/assets/0cd8dfa7-14f5-411d-b630-1ea5ce1cd427)
 
-
-[![Alt text]()](https://youtu.be/b9bNDEo3HgE?si=3BbWnbzTa_0ICZW6)
+[![Watch the video](https://img.youtube.com/vi/b9bNDEo3HgE/maxresdefault.jpg)](https://youtu.be/b9bNDEo3HgE)
