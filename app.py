@@ -13,13 +13,13 @@ from langchain.prompts import PromptTemplate
 # Load environment variables
 load_dotenv()
 
-# Check for missing environment variables
+# Set up required environment variables with error handling
 required_env_vars = ["MISTRAL_API_KEY", "PINECONE_API_KEY"]
 missing_vars = [var for var in required_env_vars if not os.getenv(var)]
 if missing_vars:
-    raise ValueError(f"Missing environment variables: {', '.join(missing_vars)}")
+    raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
-# Mistral system prompt
+# Initialize the LLM (Language Model) with the system prompt
 system_prompt = """You are an expert legal assistant specializing in Serbian Supreme Court criminal practice. Your role is to provide comprehensive, practice-oriented responses that lawyers can immediately apply to their cases.
 
 1. RESPONSE FRAMEWORK
@@ -66,94 +66,132 @@ For each cited case:
 - Include dissenting opinions when relevant
 - Reference regional court decisions confirmed by Supreme Court
 
-Always respond in **English language only**.
-"""
+Always end with: "Analysis based on Supreme Court practice. Consult legal counsel for specific application.
+Note: Remember to respond always in English not in Serbian language."""
 
-# Initialize Mistral LLM (with fixed system message)
-llm = ChatMistralAI(model="mistral-large-latest")
+llm = ChatMistralAI(model="mistral-large-latest", system_message=system_prompt)
 
-# Initialize Pinecone
-pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"), environment="us-east-1")
-index = pc.Index("criminal-practices")
+# Initialize Pinecone for vector database
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+PINECONE_ENVIRONMENT = "us-east-1"  # Ensure this matches your Pinecone environment
+pc = Pinecone(api_key=PINECONE_API_KEY, environment=PINECONE_ENVIRONMENT)
 
-# Hugging Face embeddings for text similarity
+# Connect to Pinecone index
+index_name = "criminal-practices"
+index = pc.Index(index_name)
+
+# Initialize embedding model
 embedding_function = HuggingFaceEmbeddings(
     model_name="djovak/embedic-base",
-    model_kwargs={'device': 'cpu'} if not torch.cuda.is_available() else {'device': 'cuda'}
+    model_kwargs={'device': 'cpu'}  # Simplified to always use CPU
 )
 
-# Pinecone Vectorstore
-vectorstore = PineconeVectorStore(index=index, embedding=embedding_function, text_key='text', namespace="text_chunks")
+# Add fallback message if CUDA is not available
+if not torch.cuda.is_available():
+    print("Warning: CUDA is not available. The model will run on CPU, which may lead to slower performance.")
 
-# Retriever for semantic search
+# Create Pinecone vectorstore
+vectorstore = PineconeVectorStore(
+    index=index,
+    embedding=embedding_function,
+    text_key='text',
+    namespace="text_chunks"
+)
+
+# Initialize retriever
 retriever = vectorstore.as_retriever(search_kwargs={"k": 6})
 
-# Refinement Prompt
-refinement_template = """Create a more focused Serbian legal search query. Include key terms, legal vocabulary, and eliminate unnecessary words. Output only the refined query:
+# Define the query refinement prompt template in English
+refinement_template = """Create a focused Serbian search query for the RAG retriever bot. Convert to Serbian language if not already. Include key terms, synonyms, and domain-specific vocabulary. Remove filler words. Output only the refined query in the following format: {{refined_query}},{{keyterms}},{{synonyms}}
 
-Original Query: {original_question}
+Query: {original_question}
 
 Refined Query:"""
 
-refinement_prompt = PromptTemplate(input_variables=["original_question"], template=refinement_template)
-
-# LLM Chain for refinement
-refinement_chain = refinement_prompt | llm
-
-# Combined Retrieval Prompt with Mistral
-combined_prompt = ChatPromptTemplate.from_template(
-    f"""{system_prompt}
-    
-    Use only the context provided below to answer the question:
-    {{context}}
-
-    Question: {{question}}
-    Answer:
-    """
+refinement_prompt = PromptTemplate(
+    input_variables=["original_question"],
+    template=refinement_template
 )
 
-# RetrievalQA Chain
+# Create an LLMChain for query refinement using RunnableLambda
+refinement_chain = refinement_prompt | llm
+
+# Combine the system prompt with the retrieval prompt template in English
+combined_template = f"""{system_prompt}
+
+Please answer the following question using only the context provided:
+{{context}}
+
+Question: {{question}}
+Answer:"""
+
+retrieval_prompt = ChatPromptTemplate.from_template(combined_template)
+
+# Create a retrieval chain with the combined prompt
 retrieval_chain = RetrievalQA.from_chain_type(
     llm=llm,
     chain_type="stuff",
     retriever=retriever,
-    chain_type_kwargs={"prompt": combined_prompt}
+    chain_type_kwargs={"prompt": retrieval_prompt}
 )
 
-# Processing Query
 def process_query(query: str):
     try:
-        # Step 1: Refine Query with Mistral
-        refined_query = refinement_chain.invoke({"original_question": query}).content
+        # Refine the query
+        refined_query_msg = refinement_chain.invoke({"original_question": query})
 
-        # Step 2: Retrieve and Answer
-        response = retrieval_chain.invoke({"query": refined_query})
-        return response.get("result", "") if isinstance(response, dict) else str(response)
+        if isinstance(refined_query_msg, dict):
+            refined_query = refined_query_msg.get("text", "").strip()
+        elif hasattr(refined_query_msg, 'content'):
+            refined_query = refined_query_msg.content.strip()
+        else:
+            refined_query = str(refined_query_msg).strip()
+
+        # Use the refined query in the retrieval chain
+        response_msg = retrieval_chain.invoke(refined_query)
+
+        # Corrected extraction of the response
+        if isinstance(response_msg, dict):
+            response = response_msg.get("result", "")
+        elif hasattr(response_msg, 'content'):
+            response = response_msg.content
+        else:
+            response = str(response_msg)
+
+        return response
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"An error occurred: {str(e)}"
 
-# Streamlit UI
+# Streamlit UI - Simplified Version
 st.title("Legal Egg AI 🥚")
-st.write("I'm your AI-powered legal assistant, specializing in Serbian Supreme Court criminal practice. Ask me anything related to criminal law, case precedents, and procedural rules.")
 
-# Sidebar for common legal questions
+st.write("Welcome to Research Assistant of Serbian Supreme Court Criminal Practices! I'm an AI-powered legal assistant specializing in criminal law precedents and practice patterns from Serbia High Court. Get comprehensive analysis of case law, procedural requirements, and practical application guidelines related to Criminal Court.")
+
+# Sidebar with example questions and clear chat button
 with st.sidebar:
-    st.header("Common Legal Queries")
+    st.header("Common Criminal Law Queries")
     example_questions = [
-        "What are the Supreme Court's latest positions on self-defense?",
-        "How does the Court interpret intent in corruption cases?",
-        "Evidence standards for drug trafficking cases?",
-        "Recent practice on plea bargaining?",
-        "Court's position on mitigating factors in sentencing?"
+        "1. What are the latest Supreme Court positions on self-defense conditions?",
+        "2. How does the Court interpret intent in corruption cases?",
+        "3. What evidence standards apply in drug trafficking cases?",
+        "4. Recent practice on plea bargaining requirements?",
+        "5. Court's position on mandatory mitigation factors?",
+        "6. How are aggravating circumstances evaluated in violent crimes?",
+        "7. Standards for accepting circumstantial evidence?",
+        "8. Requirements for extended confiscation?",
+        "9. Practice on repeated offenses qualification?",
+        "10. Court's interpretation of organized crime elements?"
     ]
     for q in example_questions:
         st.markdown(f"• {q}")
+
+    st.markdown("---")
 
     if st.button("New Chat", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
 
-# Manage chat history
+# Initialize chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -162,13 +200,12 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.write(message["content"])
 
-# User input
-if prompt := st.chat_input("Ask your question..."):
+# Chat input
+if prompt := st.chat_input("ask question..."):
     with st.chat_message("user"):
         st.write(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
 
-    # Get assistant response
     with st.chat_message("assistant"):
         response = process_query(prompt)
         st.write(response)
