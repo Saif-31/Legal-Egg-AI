@@ -134,17 +134,20 @@ def process_query(query: str):
 
 # Streamlit UI
 st.title("Legal Egg AI 🥚")
-st.write("I'm your AI-powered legal assistant, specializing in Serbian Supreme Court criminal practice. Ask me anything related to criminal law, case precedents, and procedural rules.")
+st.write("Welcome to Research Assistant of Serbian Supreme Court Criminal Practices! I'm an AI-powered legal assistant specializing in criminal law precedents and practice patterns from Serbia High Court. Get comprehensive analysis of case law, procedural requirements, and practical application guidelines related to Criminal Court.")
 
 # Sidebar for common legal questions
 with st.sidebar:
     st.header("Common Legal Queries")
     example_questions = [
-        "What are the Supreme Court's latest positions on self-defense?",
-        "How does the Court interpret intent in corruption cases?",
-        "Evidence standards for drug trafficking cases?",
-        "Recent practice on plea bargaining?",
-        "Court's position on mitigating factors in sentencing?"
+        "1. What are the latest Supreme Court positions on self-defense conditions?",
+        "2. How does the Court interpret intent in corruption cases?",
+        "3. What evidence standards apply in drug trafficking cases?",
+        "Recent practice on plea bargaining requirements?",
+        "Court's position on mitigating factors in sentencing?",
+        "6. How are aggravating circumstances evaluated in violent crimes?",
+        "7. Standards for accepting circumstantial evidence?",
+        "8. Requirements for extended confiscation?",
     ]
     for q in example_questions:
         st.markdown(f"• {q}")
